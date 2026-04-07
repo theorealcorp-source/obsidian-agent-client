@@ -18,6 +18,7 @@ import type {
 	ClaudeAgentSettings,
 	GeminiAgentSettings,
 	CodexAgentSettings,
+	OllamaAgentSettings,
 } from "../domain/models/agent-config";
 import { toAgentConfig } from "../shared/settings-utils";
 
@@ -204,6 +205,18 @@ function getAvailableAgentsFromSettings(
 			id: settings.gemini.id,
 			displayName: settings.gemini.displayName || settings.gemini.id,
 		},
+		{
+			id: settings.claudeSubscription.id,
+			displayName: settings.claudeSubscription.displayName || settings.claudeSubscription.id,
+		},
+		{
+			id: settings.codexSubscription.id,
+			displayName: settings.codexSubscription.displayName || settings.codexSubscription.id,
+		},
+		{
+			id: settings.ollama.id,
+			displayName: settings.ollama.displayName || settings.ollama.id,
+		},
 		...settings.customAgents.map((agent) => ({
 			id: agent.id,
 			displayName: agent.displayName || agent.id,
@@ -247,6 +260,15 @@ function findAgentSettings(
 	}
 	if (agentId === settings.gemini.id) {
 		return settings.gemini;
+	}
+	if (agentId === settings.claudeSubscription.id) {
+		return settings.claudeSubscription;
+	}
+	if (agentId === settings.codexSubscription.id) {
+		return settings.codexSubscription;
+	}
+	if (agentId === settings.ollama.id) {
+		return settings.ollama;
 	}
 	// Search in custom agents
 	const customAgent = settings.customAgents.find(
@@ -298,7 +320,20 @@ function buildAgentConfigWithApiKey(
 		};
 	}
 
-	// Custom agents - no API key injection
+	if (agentId === settings.ollama.id) {
+		const ollamaSettings = agentSettings as OllamaAgentSettings;
+		return {
+			...baseConfig,
+			env: {
+				...baseConfig.env,
+				OLLAMA_BASE_URL: ollamaSettings.baseUrl,
+				OLLAMA_MODEL: ollamaSettings.model,
+			},
+		};
+	}
+
+	// Custom agents and subscription agents (claude-subscription, codex-subscription)
+	// use ACP OAuth auth flow, no API key injection needed
 	return baseConfig;
 }
 

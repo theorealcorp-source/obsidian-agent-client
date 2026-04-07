@@ -22,6 +22,7 @@ export class AgentClientSettingTab extends PluginSettingTab {
 	plugin: AgentClientPlugin;
 	private agentSelector: DropdownComponent | null = null;
 	private unsubscribe: (() => void) | null = null;
+	private ollamaModelDropdown: DropdownComponent | null = null;
 
 	constructor(app: App, plugin: AgentClientPlugin) {
 		super(app, plugin);
@@ -475,6 +476,9 @@ export class AgentClientSettingTab extends PluginSettingTab {
 		this.renderClaudeSettings(containerEl);
 		this.renderCodexSettings(containerEl);
 		this.renderGeminiSettings(containerEl);
+		this.renderClaudeSubscriptionSettings(containerEl);
+		this.renderCodexSubscriptionSettings(containerEl);
+		this.renderOllamaSettings(containerEl);
 
 		new Setting(containerEl).setName("Custom agents").setHeading();
 
@@ -758,6 +762,21 @@ export class AgentClientSettingTab extends PluginSettingTab {
 				this.plugin.settings.gemini.displayName ||
 					this.plugin.settings.gemini.id,
 			),
+			toOption(
+				this.plugin.settings.claudeSubscription.id,
+				this.plugin.settings.claudeSubscription.displayName ||
+					this.plugin.settings.claudeSubscription.id,
+			),
+			toOption(
+				this.plugin.settings.codexSubscription.id,
+				this.plugin.settings.codexSubscription.displayName ||
+					this.plugin.settings.codexSubscription.id,
+			),
+			toOption(
+				this.plugin.settings.ollama.id,
+				this.plugin.settings.ollama.displayName ||
+					this.plugin.settings.ollama.id,
+			),
 		];
 		for (const agent of this.plugin.settings.customAgents) {
 			if (agent.id && agent.id.length > 0) {
@@ -975,6 +994,241 @@ export class AgentClientSettingTab extends PluginSettingTab {
 					.setValue(this.formatEnv(codex.env))
 					.onChange(async (value) => {
 						this.plugin.settings.codex.env = this.parseEnv(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+	}
+
+	private renderClaudeSubscriptionSettings(sectionEl: HTMLElement) {
+		const agent = this.plugin.settings.claudeSubscription;
+
+		new Setting(sectionEl)
+			.setName(agent.displayName || "Claude (Subscription)")
+			.setHeading();
+
+		new Setting(sectionEl)
+			.setName("Note")
+			.setDesc(
+				"Uses your claude.ai subscription. Authentication is handled automatically via the ACP protocol — when you first connect, a browser window will open to sign in with your Anthropic account.",
+			);
+
+		new Setting(sectionEl)
+			.setName("Path")
+			.setDesc(
+				'Absolute path to the claude-agent-acp binary. On macOS/Linux, use "which claude-agent-acp".',
+			)
+			.addText((text) => {
+				text.setPlaceholder("Absolute path to claude-agent-acp")
+					.setValue(agent.command)
+					.onChange(async (value) => {
+						this.plugin.settings.claudeSubscription.command =
+							value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(sectionEl)
+			.setName("Arguments")
+			.setDesc("Enter one argument per line. Leave empty to run without arguments.")
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatArgs(agent.args))
+					.onChange(async (value) => {
+						this.plugin.settings.claudeSubscription.args =
+							this.parseArgs(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+
+		new Setting(sectionEl)
+			.setName("Environment variables")
+			.setDesc("Enter KEY=VALUE pairs, one per line. (Stored as plain text)")
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatEnv(agent.env))
+					.onChange(async (value) => {
+						this.plugin.settings.claudeSubscription.env =
+							this.parseEnv(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+	}
+
+	private renderCodexSubscriptionSettings(sectionEl: HTMLElement) {
+		const agent = this.plugin.settings.codexSubscription;
+
+		new Setting(sectionEl)
+			.setName(agent.displayName || "Codex (ChatGPT Plus)")
+			.setHeading();
+
+		new Setting(sectionEl)
+			.setName("Note")
+			.setDesc(
+				"Uses your ChatGPT Plus subscription. Authentication is handled automatically via the ACP protocol — when you first connect, a browser window will open to sign in with your OpenAI account.",
+			);
+
+		new Setting(sectionEl)
+			.setName("Path")
+			.setDesc(
+				'Absolute path to the codex-acp binary. On macOS/Linux, use "which codex-acp".',
+			)
+			.addText((text) => {
+				text.setPlaceholder("Absolute path to codex-acp")
+					.setValue(agent.command)
+					.onChange(async (value) => {
+						this.plugin.settings.codexSubscription.command =
+							value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(sectionEl)
+			.setName("Arguments")
+			.setDesc("Enter one argument per line. Leave empty to run without arguments.")
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatArgs(agent.args))
+					.onChange(async (value) => {
+						this.plugin.settings.codexSubscription.args =
+							this.parseArgs(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+
+		new Setting(sectionEl)
+			.setName("Environment variables")
+			.setDesc("Enter KEY=VALUE pairs, one per line. (Stored as plain text)")
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatEnv(agent.env))
+					.onChange(async (value) => {
+						this.plugin.settings.codexSubscription.env =
+							this.parseEnv(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+	}
+
+	private renderOllamaSettings(sectionEl: HTMLElement) {
+		const agent = this.plugin.settings.ollama;
+
+		new Setting(sectionEl)
+			.setName(agent.displayName || "Ollama (Local LLM)")
+			.setHeading();
+
+		new Setting(sectionEl)
+			.setName("Note")
+			.setDesc(
+				'Connects to a locally running Ollama server. Make sure Ollama is running ("ollama serve") before using this agent. Requires Node.js on your PATH.',
+			);
+
+		// Base URL row
+		let baseUrlTextComponent: import('obsidian').TextComponent | null = null;
+		new Setting(sectionEl)
+			.setName("Base URL")
+			.setDesc("Ollama server URL (default: http://localhost:11434)")
+			.addText((text) => {
+				baseUrlTextComponent = text;
+				text.setPlaceholder("http://localhost:11434")
+					.setValue(agent.baseUrl)
+					.onChange(async (value) => {
+						this.plugin.settings.ollama.baseUrl = value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Model row — dropdown fetched from Ollama, with manual fallback
+		const modelSetting = new Setting(sectionEl)
+			.setName("Model")
+			.setDesc('Select a loaded Ollama model. Click “Refresh” to fetch the list from the running server.');
+
+		modelSetting.addDropdown((dropdown) => {
+			this.ollamaModelDropdown = dropdown;
+			dropdown.addOption(agent.model, agent.model);
+			dropdown.setValue(agent.model);
+			dropdown.onChange(async (value) => {
+				this.plugin.settings.ollama.model = value;
+				await this.plugin.saveSettings();
+			});
+		});
+
+		modelSetting.addButton((btn) => {
+			btn.setButtonText("Refresh").onClick(async () => {
+				const baseUrl = (baseUrlTextComponent?.getValue() ||
+					this.plugin.settings.ollama.baseUrl ||
+					"http://localhost:11434").replace(/\/$/, "");
+				try {
+					const res = await fetch(`${baseUrl}/api/tags`);
+					if (!res.ok) throw new Error(`HTTP ${res.status}`);
+					const data = await res.json() as { models?: { name: string }[] };
+					const models = (data.models ?? []).map((m) => m.name);
+					if (models.length === 0) {
+						btn.setButtonText("No models found");
+						setTimeout(() => btn.setButtonText("Refresh"), 2000);
+						return;
+					}
+					const current = this.plugin.settings.ollama.model;
+					const dropdown = this.ollamaModelDropdown;
+					if (dropdown) {
+						dropdown.selectEl.empty();
+						for (const m of models) {
+							dropdown.addOption(m, m);
+						}
+						const next = models.includes(current) ? current : models[0];
+						dropdown.setValue(next);
+						this.plugin.settings.ollama.model = next;
+						await this.plugin.saveSettings();
+					}
+					btn.setButtonText("Refresh");
+				} catch (_e) {
+					btn.setButtonText("Cannot connect");
+					setTimeout(() => btn.setButtonText("Refresh"), 2000);
+				}
+			});
+		});
+
+		new Setting(sectionEl)
+			.setName("Bridge script path")
+			.setDesc(
+				"Absolute path to the ollama-acp-server.cjs bridge script (bundled in the plugin's src/adapters/ollama/ folder).",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Absolute path to ollama-acp-server.cjs")
+					.setValue(agent.command)
+					.onChange(async (value) => {
+						this.plugin.settings.ollama.command = value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(sectionEl)
+			.setName("Arguments")
+			.setDesc("Enter one argument per line. Leave empty to run without arguments.")
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatArgs(agent.args))
+					.onChange(async (value) => {
+						this.plugin.settings.ollama.args = this.parseArgs(value);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 3;
+			});
+
+		new Setting(sectionEl)
+			.setName("Environment variables")
+			.setDesc(
+				"Enter KEY=VALUE pairs, one per line. OLLAMA_BASE_URL and OLLAMA_MODEL are derived from the fields above. (Stored as plain text)",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("")
+					.setValue(this.formatEnv(agent.env))
+					.onChange(async (value) => {
+						this.plugin.settings.ollama.env = this.parseEnv(value);
 						await this.plugin.saveSettings();
 					});
 				text.inputEl.rows = 3;

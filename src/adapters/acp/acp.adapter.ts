@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
+import * as path from "path";
 import * as acp from "@agentclientprotocol/sdk";
-import { Platform } from "obsidian";
+import { Platform, FileSystemAdapter } from "obsidian";
 
 import type {
 	IAgentClient,
@@ -177,11 +178,33 @@ export class AcpAdapter implements IAgentClient, IAcpClient {
 		// Update auto-allow permissions from plugin settings
 		this.autoAllowPermissions = this.plugin.settings.autoAllowPermissions;
 
-		// Validate command
+		// Validate command — subscription agents fall back to npx if command is empty
+		const adapter = this.plugin.app.vault.adapter;
+		const vaultBasePath = adapter instanceof FileSystemAdapter
+			? adapter.getBasePath()
+			: process.cwd();
+		const ollamaScriptPath = path.join(
+			vaultBasePath,
+			".obsidian",
+			"plugins",
+			this.plugin.manifest.id,
+			"ollama-acp-server.cjs",
+		);
+		const SUBSCRIPTION_AGENT_FALLBACKS: Record<string, { cmd: string; args: string[] }> = {
+			"claude-subscription": { cmd: "npx", args: ["@agentclientprotocol/claude-agent-acp"] },
+			"codex-subscription": { cmd: "npx", args: ["@zed-industries/codex-acp"] },
+			"ollama": { cmd: "node", args: [ollamaScriptPath] },
+		};
+
 		if (!config.command || config.command.trim().length === 0) {
-			throw new Error(
-				`Command not configured for agent "${config.displayName}" (${config.id}). Please configure the agent command in settings.`,
-			);
+			const fallback = SUBSCRIPTION_AGENT_FALLBACKS[config.id];
+			if (fallback) {
+				config = { ...config, command: fallback.cmd, args: [...fallback.args, ...config.args] };
+			} else {
+				throw new Error(
+					`Command not configured for agent "${config.displayName}" (${config.id}). Please configure the agent command in settings.`,
+				);
+			}
 		}
 
 		const command = config.command.trim();

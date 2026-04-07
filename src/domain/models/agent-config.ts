@@ -84,6 +84,40 @@ export interface CodexAgentSettings extends BaseAgentSettings {
 }
 
 /**
+ * Configuration for Claude subscription (claude.ai) agent.
+ *
+ * Uses claude-agent-acp. Authentication is handled via ACP's authMethods
+ * flow — the agent returns a "claude.ai subscription" auth option which
+ * triggers browser-based OAuth.
+ */
+export interface ClaudeSubscriptionAgentSettings extends BaseAgentSettings {
+	// No API key — ACP handles subscription auth via browser OAuth
+}
+
+/**
+ * Configuration for Codex subscription (ChatGPT Plus) agent.
+ *
+ * Uses codex-acp. Authentication is handled via ACP's authMethods flow —
+ * the agent returns a "ChatGPT subscription" auth option.
+ */
+export interface CodexSubscriptionAgentSettings extends BaseAgentSettings {
+	// No API key — ACP handles subscription auth via browser OAuth
+}
+
+/**
+ * Configuration for Ollama (local LLM) agent.
+ *
+ * Communicates with a locally running Ollama server via the bundled
+ * ollama-acp-server.cjs bridge script.
+ */
+export interface OllamaAgentSettings extends BaseAgentSettings {
+	/** Ollama base URL, default: http://localhost:11434 */
+	baseUrl: string;
+	/** Ollama model name, e.g. llama3.2, mistral, phi3 */
+	model: string;
+}
+
+/**
  * Configuration for custom ACP-compatible agents.
  *
  * Uses only the base settings, allowing users to configure

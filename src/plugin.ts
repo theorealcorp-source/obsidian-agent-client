@@ -33,6 +33,9 @@ import {
 	ClaudeAgentSettings,
 	CodexAgentSettings,
 	CustomAgentSettings,
+	ClaudeSubscriptionAgentSettings,
+	CodexSubscriptionAgentSettings,
+	OllamaAgentSettings,
 } from "./domain/models/agent-config";
 import type { SavedSessionInfo } from "./domain/models/session-info";
 import { initializeLogger } from "./shared/logger";
@@ -64,6 +67,9 @@ export interface AgentClientPluginSettings {
 	gemini: GeminiAgentSettings;
 	claude: ClaudeAgentSettings;
 	codex: CodexAgentSettings;
+	claudeSubscription: ClaudeSubscriptionAgentSettings;
+	codexSubscription: CodexSubscriptionAgentSettings;
+	ollama: OllamaAgentSettings;
 	customAgents: CustomAgentSettings[];
 	/** Default agent ID for new views (renamed from activeAgentId for multi-session) */
 	defaultAgentId: string;
@@ -115,7 +121,7 @@ export interface AgentClientPluginSettings {
 const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	claude: {
 		id: "claude-code-acp",
-		displayName: "Claude Code",
+		displayName: "Claude Code (API)",
 		apiKey: "",
 		command: "",
 		args: [],
@@ -123,8 +129,31 @@ const DEFAULT_SETTINGS: AgentClientPluginSettings = {
 	},
 	codex: {
 		id: "codex-acp",
-		displayName: "Codex",
+		displayName: "Codex (API)",
 		apiKey: "",
+		command: "",
+		args: [],
+		env: [],
+	},
+	claudeSubscription: {
+		id: "claude-subscription",
+		displayName: "Claude (Subscription)",
+		command: "",
+		args: [],
+		env: [],
+	},
+	codexSubscription: {
+		id: "codex-subscription",
+		displayName: "Codex (ChatGPT Plus)",
+		command: "",
+		args: [],
+		env: [],
+	},
+	ollama: {
+		id: "ollama",
+		displayName: "Ollama (Local LLM)",
+		baseUrl: "http://localhost:11434",
+		model: "llama3.2",
 		command: "",
 		args: [],
 		env: [],
@@ -639,6 +668,21 @@ export default class AgentClientPlugin extends Plugin {
 				displayName:
 					this.settings.gemini.displayName || this.settings.gemini.id,
 			},
+			{
+				id: this.settings.claudeSubscription.id,
+				displayName:
+					this.settings.claudeSubscription.displayName || this.settings.claudeSubscription.id,
+			},
+			{
+				id: this.settings.codexSubscription.id,
+				displayName:
+					this.settings.codexSubscription.displayName || this.settings.codexSubscription.id,
+			},
+			{
+				id: this.settings.ollama.id,
+				displayName:
+					this.settings.ollama.displayName || this.settings.ollama.id,
+			},
 			...this.settings.customAgents.map((agent) => ({
 				id: agent.id,
 				displayName: agent.displayName || agent.id,
@@ -895,10 +939,29 @@ export default class AgentClientPlugin extends Plugin {
 				)
 			: [];
 
+		const claudeSubscriptionFromRaw =
+			typeof rawSettings.claudeSubscription === "object" &&
+			rawSettings.claudeSubscription !== null
+				? (rawSettings.claudeSubscription as Record<string, unknown>)
+				: {};
+		const codexSubscriptionFromRaw =
+			typeof rawSettings.codexSubscription === "object" &&
+			rawSettings.codexSubscription !== null
+				? (rawSettings.codexSubscription as Record<string, unknown>)
+				: {};
+		const ollamaFromRaw =
+			typeof rawSettings.ollama === "object" &&
+			rawSettings.ollama !== null
+				? (rawSettings.ollama as Record<string, unknown>)
+				: {};
+
 		const availableAgentIds = [
 			DEFAULT_SETTINGS.claude.id,
 			DEFAULT_SETTINGS.codex.id,
 			DEFAULT_SETTINGS.gemini.id,
+			DEFAULT_SETTINGS.claudeSubscription.id,
+			DEFAULT_SETTINGS.codexSubscription.id,
+			DEFAULT_SETTINGS.ollama.id,
 			...customAgents.map((agent) => agent.id),
 		];
 		// Migration: support both old activeAgentId and new defaultAgentId
@@ -959,6 +1022,61 @@ export default class AgentClientPlugin extends Plugin {
 						: DEFAULT_SETTINGS.codex.command,
 				args: resolvedCodexArgs.length > 0 ? resolvedCodexArgs : [],
 				env: resolvedCodexEnv.length > 0 ? resolvedCodexEnv : [],
+			},
+			claudeSubscription: {
+				id: DEFAULT_SETTINGS.claudeSubscription.id,
+				displayName:
+					typeof claudeSubscriptionFromRaw.displayName === "string" &&
+					claudeSubscriptionFromRaw.displayName.trim().length > 0
+						? claudeSubscriptionFromRaw.displayName.trim()
+						: DEFAULT_SETTINGS.claudeSubscription.displayName,
+				command:
+					typeof claudeSubscriptionFromRaw.command === "string" &&
+					claudeSubscriptionFromRaw.command.trim().length > 0
+						? claudeSubscriptionFromRaw.command.trim()
+						: DEFAULT_SETTINGS.claudeSubscription.command,
+				args: sanitizeArgs(claudeSubscriptionFromRaw.args),
+				env: normalizeEnvVars(claudeSubscriptionFromRaw.env),
+			},
+			codexSubscription: {
+				id: DEFAULT_SETTINGS.codexSubscription.id,
+				displayName:
+					typeof codexSubscriptionFromRaw.displayName === "string" &&
+					codexSubscriptionFromRaw.displayName.trim().length > 0
+						? codexSubscriptionFromRaw.displayName.trim()
+						: DEFAULT_SETTINGS.codexSubscription.displayName,
+				command:
+					typeof codexSubscriptionFromRaw.command === "string" &&
+					codexSubscriptionFromRaw.command.trim().length > 0
+						? codexSubscriptionFromRaw.command.trim()
+						: DEFAULT_SETTINGS.codexSubscription.command,
+				args: sanitizeArgs(codexSubscriptionFromRaw.args),
+				env: normalizeEnvVars(codexSubscriptionFromRaw.env),
+			},
+			ollama: {
+				id: DEFAULT_SETTINGS.ollama.id,
+				displayName:
+					typeof ollamaFromRaw.displayName === "string" &&
+					ollamaFromRaw.displayName.trim().length > 0
+						? ollamaFromRaw.displayName.trim()
+						: DEFAULT_SETTINGS.ollama.displayName,
+				baseUrl:
+					typeof ollamaFromRaw.baseUrl === "string" &&
+					ollamaFromRaw.baseUrl.trim().length > 0
+						? ollamaFromRaw.baseUrl.trim()
+						: DEFAULT_SETTINGS.ollama.baseUrl,
+				model:
+					typeof ollamaFromRaw.model === "string" &&
+					ollamaFromRaw.model.trim().length > 0
+						? ollamaFromRaw.model.trim()
+						: DEFAULT_SETTINGS.ollama.model,
+				command:
+					typeof ollamaFromRaw.command === "string" &&
+					ollamaFromRaw.command.trim().length > 0
+						? ollamaFromRaw.command.trim()
+						: DEFAULT_SETTINGS.ollama.command,
+				args: sanitizeArgs(ollamaFromRaw.args),
+				env: normalizeEnvVars(ollamaFromRaw.env),
 			},
 			gemini: {
 				id: DEFAULT_SETTINGS.gemini.id,
@@ -1321,6 +1439,9 @@ export default class AgentClientPlugin extends Plugin {
 		ids.add(this.settings.claude.id);
 		ids.add(this.settings.codex.id);
 		ids.add(this.settings.gemini.id);
+		ids.add(this.settings.claudeSubscription.id);
+		ids.add(this.settings.codexSubscription.id);
+		ids.add(this.settings.ollama.id);
 		for (const agent of this.settings.customAgents) {
 			if (agent.id && agent.id.length > 0) {
 				ids.add(agent.id);
